@@ -1,3 +1,5 @@
+#gm_planet.py
+
 import math
 import random
 import os
@@ -14,10 +16,7 @@ class TaskPlanetItem(QGraphicsItem):
     STATE_HOVERED = 1
     STATE_PINNED = 2
 
-    def __init__(self, task_data, accent_color, orbit_radius, start_angle, pin_callback, status_callback, size_mode, calculated_radius):
-        """
-        calculated_radius: Передается извне, рассчитанный на основе "веса" задачи в общей системе.
-        """
+    def __init__(self, task_data, accent_color, orbit_radius, start_angle, pin_callback, status_callback, calculated_radius):
         super().__init__()
         self.data = task_data
         self.text = task_data.get("text", "Task")
@@ -25,48 +24,62 @@ class TaskPlanetItem(QGraphicsItem):
         self.accent = QColor(accent_color)
         self.pin_callback = pin_callback
         self.status_callback = status_callback
-        self.size_mode = size_mode
         
         self.is_done = task_data.get("checked", False)
         self.is_cancelled = task_data.get("cancelled", False)
         
-        # --- 3. ХАОТИЧНЫЙ РАЗМЕР (ПРИМЕНЕНИЕ) ---
-        # Мы используем radius, переданный из build_map, который уже учитывает % дел
         self.radius = calculated_radius
         self.rect = QRectF(-self.radius, -self.radius, self.radius * 2, self.radius * 2)
         
         self.orbit_radius = orbit_radius
         self.current_angle = start_angle
         
-        # --- 2. РЕАЛИСТИЧНАЯ ФИЗИКА СКОРОСТИ ---
-        # Закон Кеплера: Скорость падает с корнем от расстояния
-        # dist_factor уменьшается при росте орбиты
+        # --- ФИЗИКА ---
         dist_factor = 1000 / (orbit_radius if orbit_radius > 0 else 1)
-        
-        # Базовая скорость по физике
         kepler_speed = math.sqrt(dist_factor) * 0.05
-        
-        # Добавляем индивидуальность ("Характер" планеты: ленивая или шустрая)
         personality_speed = random.uniform(0.8, 1.5)
-        
-        # Случайное направление вращения
         direction = 1 if random.random() > 0.5 else -1
-        
         self.speed = kepler_speed * personality_speed * direction
+        
+        self.dash_offset = 0.0
         
         self.state = self.STATE_NORMAL
         self.current_scale = 1.0
         self.target_scale = 1.0
         self.is_hovered = False
         
+        # Базовый Z-уровень (будет переназначен в goal_map в зависимости от размера)
+        self.base_z = 0 
+        
         self.setAcceptHoverEvents(True)
         
         self.continents = []
-        self.broken_body_path = None; self.shards = []; self.debris_field = []
+        self.broken_body_path = None
+        self.shards = []
+        self.debris_field = []
         self.broken_pixmap = None
         
         self.refresh_geometry()
         self._spawn_moons()
+
+    # --- ГЛАВНОЕ ИСПРАВЛЕНИЕ: ТОЧНАЯ ОБЛАСТЬ КЛИКА ---
+    def shape(self):
+        """
+        Определяет физическую форму для столкновений мышкой.
+        Возвращаем только круг планеты, игнорируя орбиты и луны (луны обрабатывают клики сами).
+        """
+        path = QPainterPath()
+        path.addEllipse(self.rect)
+        return path
+
+    def get_system_radius(self):
+        max_dist = self.radius
+        for child in self.childItems():
+            if isinstance(child, SubTaskMoonItem):
+                dist = child.orbit_radius + child.radius + 20 
+                if dist > max_dist:
+                    max_dist = dist
+        return max_dist
 
     def sync_with_data(self):
         real_done = self.data.get("checked", False)
@@ -77,31 +90,44 @@ class TaskPlanetItem(QGraphicsItem):
             self.is_cancelled = real_cancel
             self.refresh_geometry()
             need_update = True
+        
         if self.is_done != real_done:
             self.is_done = real_done
             need_update = True
+            
         if need_update:
             self.update()
 
     def refresh_geometry(self):
         self.continents = []
-        self.broken_body_path = None; self.shards = []; self.debris_field = []
+        self.broken_body_path = None
+        self.shards = []
+        self.debris_field = []
         self.chaos_level = 0
         
         for child in self.children_data:
-            if child.get("cancelled", False): self.chaos_level += 1
+            if child.get("cancelled", False):
+                self.chaos_level += 1
         
         if self.is_cancelled:
             self.chaos_level += 3 
-            if self.chaos_level > 0: self._generate_diverse_debris()
-            if os.path.exists("broken.png"): self.broken_pixmap = QPixmap("broken.png")
-            else: self._generate_unique_shatter()
+            if self.chaos_level > 0:
+                self._generate_diverse_debris()
+            
+            if os.path.exists("broken.png"):
+                self.broken_pixmap = QPixmap("broken.png")
+            else:
+                self._generate_unique_shatter()
         else:
-            if self.chaos_level > 0: self._generate_diverse_debris()
-            # Кол-во континентов зависит от размера
-            base_count = int(self.radius / 12)
+            if self.chaos_level > 0:
+                self._generate_diverse_debris()
+            
+            base_count = int(self.radius / 15) 
             num_continents = random.randint(max(3, base_count), max(5, base_count + 5))
-            for _ in range(num_continents): self.continents.append(self._generate_jagged_continent())
+            
+            for _ in range(num_continents):
+                self.continents.append(self._generate_jagged_continent())
+                
         self.update()
 
     def set_status(self, done=None, cancelled=None, silent=False):
@@ -159,150 +185,242 @@ class TaskPlanetItem(QGraphicsItem):
     def contextMenuEvent(self, event):
         menu = QMenu()
         menu.setStyleSheet("QMenu { background-color: #202020; color: white; border: 1px solid #555; } QMenu::item:selected { background-color: #404040; }")
+        
         action_done = menu.addAction("✅ Выполнено" if not self.is_done else "🔙 Вернуть в работу")
         action_cancel = menu.addAction("❌ Зачеркнуть" if not self.is_cancelled else "✨ Восстановить")
         menu.addSeparator()
         action_reroll = menu.addAction("🎲 Пересобрать ландшафт")
+        
         res = menu.exec(event.screenPos())
-        if res == action_done: self.set_status(done=not self.is_done)
+        
+        if res == action_done:
+            self.set_status(done=not self.is_done)
         elif res == action_cancel:
             new_val = not self.is_cancelled
             self.set_status(cancelled=new_val, done=False if new_val else self.is_done)
-        elif res == action_reroll: self.refresh_geometry()
+        elif res == action_reroll:
+            self.refresh_geometry()
 
     def advance(self, phase):
         if not phase: return
+        
+        self.dash_offset -= 0.5
+        if self.dash_offset < -100: self.dash_offset = 0
+        
         if self.state != self.STATE_PINNED:
             self.current_angle += self.speed
             rad = math.radians(self.current_angle)
-            x = self.orbit_radius * math.cos(rad); y = self.orbit_radius * math.sin(rad)
+            x = self.orbit_radius * math.cos(rad)
+            y = self.orbit_radius * math.sin(rad)
             self.setPos(x, y)
+            
         if abs(self.current_scale - self.target_scale) > 0.0001:
             self.current_scale += (self.target_scale - self.current_scale) * 0.05
             self.setScale(self.current_scale)
+        
+        if self.is_hovered or self.state == self.STATE_PINNED:
+            self.update()
 
     def hoverEnterEvent(self, event):
         self.is_hovered = True
-        if self.state == self.STATE_NORMAL: self.state = self.STATE_HOVERED; self.target_scale = 1.1; self.setZValue(10)
+        if self.state == self.STATE_NORMAL:
+            self.state = self.STATE_HOVERED
+            self.target_scale = 1.1
+            # Поднимаем высоко, но не выше пина
+            self.setZValue(500)
         self._update_links(True)
+
     def hoverLeaveEvent(self, event):
         self.is_hovered = False
-        if self.state == self.STATE_HOVERED: self.state = self.STATE_NORMAL; self.target_scale = 1.0; self.setZValue(0)
+        if self.state == self.STATE_HOVERED:
+            self.state = self.STATE_NORMAL
+            self.target_scale = 1.0
+            # Возвращаем на базовый уровень (сортировка по размеру)
+            self.setZValue(self.base_z)
         self._update_links(False)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            if self.state == self.STATE_PINNED: self.set_pinned(False); self.pin_callback(None)
-            else: self.set_pinned(True); self.pin_callback(self)
+            if self.state == self.STATE_PINNED:
+                self.set_pinned(False)
+                self.pin_callback(None)
+            else:
+                self.set_pinned(True)
+                self.pin_callback(self)
         super().mousePressEvent(event)
+
     def set_pinned(self, pinned):
-        if pinned: self.state = self.STATE_PINNED; self.target_scale = 2.5; self.setZValue(100)
-        else: self.state = self.STATE_NORMAL; self.target_scale = 1.0; self.setZValue(0)
+        if pinned:
+            self.state = self.STATE_PINNED
+            self.target_scale = 1.0 
+            # Самый высокий приоритет
+            self.setZValue(1000)
+        else:
+            self.state = self.STATE_NORMAL
+            self.target_scale = 1.0
+            self.setZValue(self.base_z)
+            
         self._update_links(pinned)
         for child in self.childItems():
-            if isinstance(child, SubTaskMoonItem): child.set_show_title(pinned)
+            if isinstance(child, SubTaskMoonItem):
+                child.set_show_title(pinned)
+
     def _update_links(self, highlighted):
         for child in self.childItems():
              if isinstance(child, QGraphicsPathItem):
-                 pen = child.pen(); color = QColor(self.accent); color.setAlpha(150 if highlighted else 40); pen.setColor(color); child.setPen(pen)
+                 pen = child.pen()
+                 color = QColor(self.accent)
+                 color.setAlpha(150 if highlighted else 40)
+                 pen.setColor(color)
+                 child.setPen(pen)
         self.update()
 
     def _spawn_moons(self):
         if not self.children_data: return
+        
         count = len(self.children_data)
-        base_dist = self.radius + (150 if self.size_mode == 3 else (100 if self.size_mode == 2 else 60))
+        current_orbit_dist = self.radius + 60 
+        
         for i, child_data in enumerate(self.children_data):
-            spread = 100 if self.size_mode == 3 else 60
-            orbit_dist = base_dist + (i * random.randint(spread - 20, spread + 20))
             start_angle = (360 / count) * i + random.uniform(0, 90)
             speed = random.uniform(0.5, 1.5) * (1 if random.random() > 0.5 else -1)
-            moon = SubTaskMoonItem(child_data, self.accent, orbit_dist, start_angle, speed, self.status_callback)
-            moon.setParentItem(self); moon.advance(1)
-            orbit_path = QPainterPath(); orbit_path.addEllipse(QPointF(0,0), orbit_dist, orbit_dist)
-            orbit_item = QGraphicsPathItem(orbit_path, self); pen = QPen(self.accent, 2)
-            d1 = random.randint(5, 25); d2 = random.randint(10, 30); pen.setDashPattern([d1, d2])
-            color = QColor(self.accent); color.setAlpha(40); pen.setColor(color)
-            orbit_item.setPen(pen); orbit_item.setZValue(-1)
+            
+            moon = SubTaskMoonItem(child_data, self.accent, 0, start_angle, speed, self.status_callback)
+            
+            moon_space_needed = moon.radius + 15 
+            current_orbit_dist += moon_space_needed
+            
+            moon.orbit_radius = current_orbit_dist
+            moon.setParentItem(self)
+            moon.advance(1) 
+            
+            orbit_path = QPainterPath()
+            orbit_path.addEllipse(QPointF(0,0), current_orbit_dist, current_orbit_dist)
+            
+            orbit_item = QGraphicsPathItem(orbit_path, self)
+            pen = QPen(self.accent, 2)
+            d1 = random.randint(5, 25)
+            d2 = random.randint(10, 30)
+            pen.setDashPattern([d1, d2])
+            
+            color = QColor(self.accent)
+            color.setAlpha(40)
+            pen.setColor(color)
+            
+            orbit_item.setPen(pen)
+            # Орбиты всегда ниже самой планеты
+            orbit_item.setZValue(-1)
+            
+            current_orbit_dist += moon_space_needed + 10 
 
     def _generate_jagged_continent(self):
-        path = QPainterPath(); cx = random.uniform(-self.radius*0.8, self.radius*0.8); cy = random.uniform(-self.radius*0.8, self.radius*0.8)
+        path = QPainterPath()
+        cx = random.uniform(-self.radius*0.8, self.radius*0.8)
+        cy = random.uniform(-self.radius*0.8, self.radius*0.8)
+        
         num_points = random.randint(10, 20)
         base_radius = random.uniform(self.radius * 0.15, self.radius * 0.35)
         points = []
+        
         for i in range(num_points):
-            angle = math.radians((360 / num_points) * i); noise = random.uniform(-base_radius * 0.3, base_radius * 0.3); r = base_radius + noise
-            px = cx + math.cos(angle) * r; py = cy + math.sin(angle) * r; points.append(QPointF(px, py))
-        polygon = QPolygonF(points); path.addPolygon(polygon); return path
+            angle = math.radians((360 / num_points) * i)
+            noise = random.uniform(-base_radius * 0.3, base_radius * 0.3)
+            r = base_radius + noise
+            px = cx + math.cos(angle) * r
+            py = cy + math.sin(angle) * r
+            points.append(QPointF(px, py))
+            
+        polygon = QPolygonF(points)
+        path.addPolygon(polygon)
+        return path
 
     def _generate_diverse_debris(self):
         count = random.randint(10, 20) + (self.chaos_level * 8)
         for _ in range(count):
             dist = self.radius * random.triangular(1.1, 3.0, 1.4)
-            angle = random.uniform(0, 360); dx = math.cos(math.radians(angle)) * dist; dy = math.sin(math.radians(angle)) * dist
+            angle = random.uniform(0, 360)
+            dx = math.cos(math.radians(angle)) * dist
+            dy = math.sin(math.radians(angle)) * dist
+            
             size = random.uniform(2.0, 10.0)
             poly = QPolygonF()
-            for _ in range(random.randint(3,5)): poly.append(QPointF(random.uniform(-size, size), random.uniform(-size, size)))
-            rotation = random.uniform(0, 360); transform = QTransform().translate(dx, dy).rotate(rotation); final_poly = transform.map(poly)
-            gray = random.randint(50, 120); alpha = random.randint(100, 255); color = QColor(gray, gray, gray, alpha)
+            for _ in range(random.randint(3,5)):
+                poly.append(QPointF(random.uniform(-size, size), random.uniform(-size, size)))
+            
+            rotation = random.uniform(0, 360)
+            transform = QTransform().translate(dx, dy).rotate(rotation)
+            final_poly = transform.map(poly)
+            
+            gray = random.randint(50, 120)
+            alpha = random.randint(100, 255)
+            color = QColor(gray, gray, gray, alpha)
+            
             self.debris_field.append((final_poly, color))
 
     def _generate_unique_shatter(self):
-        planet_shape = QPainterPath(); planet_shape.addEllipse(self.rect); cuts = QPainterPath(); num_cuts = random.randint(2, 3)
-        for _ in range(num_cuts):
-            angle = random.uniform(0, 360); r_start = self.radius * 1.8; start_p = QPointF(math.cos(math.radians(angle))*r_start, math.sin(math.radians(angle))*r_start)
-            end_angle = angle + 180 + random.uniform(-40, 40); end_p = QPointF(math.cos(math.radians(end_angle))*r_start, math.sin(math.radians(end_angle))*r_start)
-            single_cut = QPainterPath(); single_cut.moveTo(start_p)
-            steps = random.randint(4, 7)
-            for i in range(1, steps):
-                t = i / steps; bx = start_p.x() + (end_p.x() - start_p.x()) * t; by = start_p.y() + (end_p.y() - start_p.y()) * t; jitter = random.uniform(-20, 20)
-                single_cut.lineTo(bx + jitter, by + jitter)
-            single_cut.lineTo(end_p); stroker = QPainterPathStroker(); stroker.setWidth(random.uniform(15, 35)); stroker.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
-            cuts.addPath(stroker.createStroke(single_cut))
-        self.broken_body_path = planet_shape.subtracted(cuts); debris_source = planet_shape.intersected(cuts); num_shards = random.randint(5, 12)
-        for _ in range(num_shards):
-            sx = random.uniform(-self.radius, self.radius); sy = random.uniform(-self.radius, self.radius); shard_poly = QPolygonF()
-            for _ in range(random.randint(3, 6)): shard_poly.append(QPointF(sx + random.uniform(-15,15), sy + random.uniform(-15,15)))
-            shard_path = QPainterPath(); shard_path.addPolygon(shard_poly); final_shard = debris_source.intersected(shard_path)
-            if not final_shard.isEmpty():
-                move_dist = random.uniform(10, 40); move_angle = math.atan2(sy, sx) + random.uniform(-0.5, 0.5); dx = math.cos(move_angle) * move_dist; dy = math.sin(move_angle) * move_dist; final_shard.translate(dx, dy); self.shards.append(final_shard)
+        planet_shape = QPainterPath()
+        planet_shape.addEllipse(self.rect)
+        cuts = QPainterPath()
+        
+        for _ in range(random.randint(2, 3)):
+            angle = random.uniform(0, 360)
+            r_start = self.radius * 1.8
+            p1 = QPointF(math.cos(math.radians(angle))*r_start, math.sin(math.radians(angle))*r_start)
+            p2 = QPointF(math.cos(math.radians(angle+180))*r_start, math.sin(math.radians(angle+180))*r_start)
+            
+            path = QPainterPath()
+            path.moveTo(p1)
+            path.lineTo(p2)
+            
+            stroker = QPainterPathStroker()
+            stroker.setWidth(random.uniform(10, 30))
+            cuts.addPath(stroker.createStroke(path))
+            
+        self.broken_body_path = planet_shape.subtracted(cuts)
 
-    def boundingRect(self): return self.rect.adjusted(-600, -600, 600, 600)
+    def boundingRect(self):
+        sys_r = self.get_system_radius() + 50
+        return self.rect.adjusted(-sys_r, -sys_r, sys_r, sys_r)
 
     def paint(self, painter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # --- 1. МЕРТВАЯ/ОТМЕНЕННАЯ ---
         if self.is_cancelled:
             if self.broken_pixmap:
-                target_rect = QRectF(-self.radius, -self.radius, self.radius*2, self.radius*2); painter.setOpacity(0.8); painter.drawPixmap(target_rect.toRect(), self.broken_pixmap); painter.setOpacity(1.0)
+                painter.drawPixmap(self.rect.toRect(), self.broken_pixmap)
             else:
                 if self.debris_field:
                     painter.setPen(Qt.PenStyle.NoPen)
-                    for poly, color in self.debris_field: painter.setBrush(QBrush(color)); painter.drawPolygon(poly)
-                dead_color = QColor("#2b2b2b"); painter.setBrush(QBrush(dead_color)); painter.setPen(QPen(QColor("#555555"), 1))
-                if self.broken_body_path: painter.drawPath(self.broken_body_path)
-                shard_color = QColor("#353535"); painter.setBrush(QBrush(shard_color))
-                for shard in self.shards: painter.drawPath(shard)
+                    for poly, color in self.debris_field:
+                        painter.setBrush(QBrush(color))
+                        painter.drawPolygon(poly)
+                        
+                painter.setBrush(QBrush(QColor("#2b2b2b")))
+                painter.setPen(Qt.PenStyle.NoPen)
+                
+                if self.broken_body_path:
+                    painter.drawPath(self.broken_body_path)
+            
             self._draw_text(painter, strike=True, color="#666666")
             return
         
-        # --- 2. ЦВЕТОВАЯ ЛОГИКА ---
         if self.is_done:
-            # ЖИВАЯ
             base_color = QColor(self.accent)
             land_color = self.accent.lighter(130); land_color.setAlpha(200)
             atmos_color = self.accent
             atmos_alpha = 255 
             shadow_alpha = 80 
         else:
-            # МЕРТВЫЙ КАМЕНЬ
             base_color = QColor("#1a1a1a") 
             land_color = QColor("#2a2a2a") 
             atmos_color = QColor("#555555")
             atmos_alpha = 50 
             shadow_alpha = 240 
 
-        # --- 3. ТЕЛО ---
-        painter.save(); planet_path = QPainterPath(); planet_path.addEllipse(self.rect); painter.setClipPath(planet_path)
+        painter.save()
+        planet_path = QPainterPath()
+        planet_path.addEllipse(self.rect)
+        painter.setClipPath(planet_path)
         
         ocean_grad = QRadialGradient(QPointF(0,0), self.radius)
         if self.is_done:
@@ -314,8 +432,10 @@ class TaskPlanetItem(QGraphicsItem):
         
         painter.fillPath(planet_path, QBrush(ocean_grad))
         
-        painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(QBrush(land_color))
-        for continent in self.continents: painter.drawPath(continent)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(land_color))
+        for continent in self.continents:
+            painter.drawPath(continent)
         
         shadow_grad = QRadialGradient(QPointF(0, 0), self.radius)
         shadow_grad.setColorAt(0.65, QColor(0,0,0,0))
@@ -324,46 +444,59 @@ class TaskPlanetItem(QGraphicsItem):
         
         painter.restore()
 
-        # --- 4. АТМОСФЕРА ---
-        if not self.is_done: # Ободок для мертвой
-            painter.setBrush(Qt.BrushStyle.NoBrush); painter.setPen(QPen(QColor("#404040"), 2))
+        if not self.is_done: 
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor("#404040"), 2))
             painter.drawEllipse(self.rect)
 
-        atmos_gap = 20 if self.size_mode == 1 else (35 if self.size_mode == 2 else 50)
+        atmos_gap = self.radius * 0.15
         atmos_rect = self.rect.adjusted(-atmos_gap, -atmos_gap, atmos_gap, atmos_gap)
-        pen_width = 4 if self.size_mode == 1 else 6
+        pen_width = max(3, self.radius * 0.04)
         
         atmos_pen = QPen(atmos_color, pen_width)
-        atmos_pen.setDashPattern([15, 15]) 
+        atmos_pen.setDashPattern([15, 15])
+        
+        atmos_pen.setDashOffset(self.dash_offset) 
         
         final_alpha = atmos_alpha
         if self.is_hovered or self.state == self.STATE_PINNED: 
             final_alpha = 255 
             if not self.is_done: atmos_pen.setColor(QColor("#888888"))
         
-        color = QColor(atmos_color); color.setAlpha(final_alpha)
+        color = QColor(atmos_color)
+        color.setAlpha(final_alpha)
         atmos_pen.setColor(color)
-        painter.setBrush(Qt.BrushStyle.NoBrush); painter.setPen(atmos_pen)
+        
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(atmos_pen)
         painter.drawEllipse(atmos_rect)
 
-        # --- 5. ТЕКСТ ---
         text_color = "#ffffff"
         if not self.is_done and not self.is_hovered and self.state != self.STATE_PINNED:
-            text_color = "#666666" 
+            text_color = "#666666"
         elif self.is_done:
             text_color = "#ffffff"
             
         self._draw_text(painter, strike=False, color=text_color)
 
     def _draw_text(self, painter, strike, color):
-        f_size = 14 if self.size_mode == 1 else (18 if self.size_mode == 2 else 24)
-        font_text = QFont("Arial", f_size, QFont.Weight.Bold); font_text.setStrikeOut(strike); painter.setPen(QColor(color)); painter.setFont(font_text)
-        box_w = 300 if self.size_mode == 1 else (400 if self.size_mode == 2 else 500)
-        fm = QFontMetrics(font_text); elided = fm.elidedText(self.text, Qt.TextElideMode.ElideRight, box_w)
-        offset_y = self.radius + (50 if self.size_mode == 1 else 80)
-        text_rect = QRectF(-box_w/2, offset_y, box_w, 50)
+        base_size = max(14, self.radius * 0.1)
+        font_text = QFont("Arial", int(base_size), QFont.Weight.Bold)
+        font_text.setStrikeOut(strike)
+        painter.setPen(QColor(color))
+        painter.setFont(font_text)
+        
+        box_w = self.radius * 4 
+        fm = QFontMetrics(font_text)
+        elided = fm.elidedText(self.text, Qt.TextElideMode.ElideRight, int(box_w))
+        
+        offset_y = self.radius + (base_size * 2)
+        text_rect = QRectF(-box_w/2, offset_y, box_w, 100)
         
         if not self.is_cancelled and (self.is_hovered or self.state == self.STATE_PINNED):
-            painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(QBrush(QColor(0,0,0,180))); painter.drawRoundedRect(text_rect.adjusted(-5,0,5,0), 8, 8); painter.setPen(QColor(color))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(0,0,0,180)))
+            painter.drawRoundedRect(text_rect.adjusted(-5,0,5,0), 8, 8)
+            painter.setPen(QColor(color))
         
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, elided)
