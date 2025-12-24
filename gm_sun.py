@@ -1,8 +1,8 @@
-#gm_sun.py
-
+import math
 from PyQt6.QtWidgets import QGraphicsItem
 from PyQt6.QtCore import Qt, QRectF, QPointF
-from PyQt6.QtGui import QColor, QPen, QBrush, QPainter, QFont, QRadialGradient, QLinearGradient
+from PyQt6.QtGui import (QColor, QPen, QBrush, QPainter, QFont, 
+                         QRadialGradient, QLinearGradient, QPainterPath, QFontMetrics)
 
 class SunItem(QGraphicsItem):
     def __init__(self, title, accent_color, progress_ratio, pin_callback):
@@ -15,30 +15,28 @@ class SunItem(QGraphicsItem):
         self.pinned = False
         self.is_hovered = False
         
-        # Базовый размер, будет обновлен извне
         self.radius = 400
         self.update_geometry_rects()
         
         self.current_scale = 1.0
         self.target_scale = 1.0
+        self.pulse_phase = 0.0
         
         self.setAcceptHoverEvents(True)
         self.setZValue(-10) 
 
     def update_size(self, new_radius):
-        """Динамическое изменение размера Солнца"""
         self.radius = new_radius
         self.update_geometry_rects()
         self.update()
 
     def update_geometry_rects(self):
         self.rect = QRectF(-self.radius, -self.radius, self.radius*2, self.radius*2)
-        # Аура пропорциональна радиусу
-        aura_gap = self.radius * 0.3
+        aura_gap = self.radius * 0.8
         self.aura_rect = self.rect.adjusted(-aura_gap, -aura_gap, aura_gap, aura_gap)
 
     def boundingRect(self):
-        return self.aura_rect.adjusted(-200, -200, 200, 200)
+        return self.aura_rect
 
     def set_progress(self, new_ratio):
         self.progress = max(0.0, min(1.0, new_ratio))
@@ -46,9 +44,13 @@ class SunItem(QGraphicsItem):
 
     def advance(self, phase):
         if not phase: return
+        
         if abs(self.current_scale - self.target_scale) > 0.001:
             self.current_scale += (self.target_scale - self.current_scale) * 0.05
             self.setScale(self.current_scale)
+            
+        self.pulse_phase += 0.02
+        self.update()
 
     def hoverEnterEvent(self, event):
         self.is_hovered = True
@@ -73,28 +75,34 @@ class SunItem(QGraphicsItem):
 
     def paint(self, painter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        center = QPointF(0,0)
         
-        # 1. АУРА
-        extra_glow = 150 if self.pinned else (100 if self.is_hovered else 0)
-        glow_radius = (self.radius * 1.5) + extra_glow
+        base_glow_alpha = 100
+        if self.is_hovered or self.pinned:
+            base_glow_alpha = 160
+            
+        pulse = (math.sin(self.pulse_phase) + 1) / 2 
         
-        glow = QRadialGradient(center, glow_radius)
-        glow.setColorAt(0.4, QColor(0,0,0,0))
-        
-        glow_alpha = 120 if self.pinned else (100 if self.is_hovered else 80)
-        glow_col = QColor(self.accent)
-        glow_col.setAlpha(glow_alpha)
-        
-        glow.setColorAt(0.75, glow_col)
-        glow.setColorAt(1.0, QColor(0,0,0,0))
+        # --- 1. СВЕЧЕНИЕ ---
+        layers = [
+            (1.8, 0.4, 0.05),
+            (1.5, 0.7, 0.08),
+            (1.2, 1.0, 0.10)
+        ]
         
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(glow))
-        painter.drawEllipse(center, glow_radius, glow_radius)
+        for r_mult, a_mult, p_eff in layers:
+            current_r = self.radius * (r_mult + pulse * p_eff)
+            grad = QRadialGradient(QPointF(0,0), current_r)
+            col = QColor(self.accent)
+            alpha = int(base_glow_alpha * a_mult * (0.8 + pulse * 0.2))
+            col.setAlpha(min(255, alpha))
+            grad.setColorAt(self.radius / current_r, col) 
+            grad.setColorAt(1.0, QColor(0,0,0,0)) 
+            painter.setBrush(QBrush(grad))
+            painter.drawEllipse(QPointF(0,0), current_r, current_r)
 
-        # 2. ПРОГРЕСС
-        pen_width = self.radius * 0.08 # Толщина зависит от размера
+        # --- 2. ПРОГРЕСС ---
+        pen_width = self.radius * 0.08
         ring_rect = self.rect.adjusted(pen_width/2, pen_width/2, -pen_width/2, -pen_width/2)
         
         bg_grad = QLinearGradient(ring_rect.topLeft(), ring_rect.bottomRight())
@@ -114,21 +122,42 @@ class SunItem(QGraphicsItem):
             span_angle = int(-self.progress * 360 * 16)
             painter.drawArc(ring_rect, start_angle, span_angle)
 
-        # 3. ЯДРО
+        # --- 3. ЯДРО ---
         core_rect = ring_rect.adjusted(pen_width/2 + 10, pen_width/2 + 10, -pen_width/2 - 10, -pen_width/2 - 10)
         painter.setBrush(QBrush(QColor("#ffffff")))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(core_rect)
         
-        # 4. ТЕКСТ
-        base_font_size = self.radius * 0.15
-        font_size = base_font_size * 1.2 if self.pinned else base_font_size
-        font = QFont("Arial", int(font_size), QFont.Weight.Bold)
-        font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 110)
-        painter.setFont(font); painter.setPen(QColor("#000000")) 
-        painter.drawText(core_rect, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, self.title)
+        # --- 4. АДАПТИВНЫЙ ТЕКСТ ---
+        # Максимально доступная ширина (с отступами внутри круга)
+        available_width = core_rect.width() * 0.85 
         
-        font_small = QFont("Arial", int(base_font_size * 0.6))
+        # Начинаем с шрифта побольше
+        font_size = self.radius * 0.3 
+        font = QFont("Arial", int(font_size), QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 105)
+        
+        fm = QFontMetrics(font)
+        
+        # Уменьшаем шрифт, пока текст не влезет или не станет слишком мелким
+        min_font_size = 12
+        while (fm.horizontalAdvance(self.title) > available_width) and (font_size > min_font_size):
+            font_size -= 1.0
+            font.setPointSize(int(font_size))
+            fm = QFontMetrics(font)
+            
+        # Если все равно не влазит - обрезаем (Elide)
+        elided_title = fm.elidedText(self.title, Qt.TextElideMode.ElideRight, int(available_width))
+        
+        painter.setFont(font)
+        painter.setPen(QColor("#000000")) 
+        
+        # Рисуем по центру
+        painter.drawText(core_rect, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_title)
+        
+        # Проценты внизу
+        font_small = QFont("Arial", int(max(10, font_size * 0.5)))
         painter.setFont(font_small)
-        percent_rect = core_rect.adjusted(0, self.radius * 0.4, 0, 0)
+        # Смещаем вниз относительно центра
+        percent_rect = core_rect.adjusted(0, self.radius * 0.5, 0, 0)
         painter.drawText(percent_rect, Qt.AlignmentFlag.AlignCenter, f"{int(self.progress*100)}%")
