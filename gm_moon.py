@@ -47,16 +47,13 @@ class SubTaskMoonItem(QGraphicsItem):
         self.setAcceptHoverEvents(True)
 
     def sync_with_data(self):
-        """Проверяем данные и обновляемся"""
         real_done = self.data.get("checked", False)
         real_cancel = self.data.get("cancelled", False)
         
-        # Обновляем отмену (геометрия)
         if self.is_cancelled != real_cancel:
             self.is_cancelled = real_cancel
             self.refresh_geometry()
             
-        # Обновляем выполнение (цвет)
         if self.is_done != real_done:
             self.is_done = real_done
             self.update()
@@ -173,27 +170,37 @@ class SubTaskMoonItem(QGraphicsItem):
             for speck in self.dust: painter.drawPolygon(speck)
             return
 
+        # --- СУПЕР КОНТРАСТНАЯ ЛОГИКА ДЛЯ ЛУН ---
         if self.is_done:
-            base_color = self.accent.darker(150); base_color.setAlpha(200)
-            feat_color = self.accent.darker(110)
-            border_color = self.accent.lighter(130)
+            # СВЕТЛЯЧОК: Яркий цвет, свечение
+            base_color = self.accent
+            feat_color = self.accent.lighter(130)
+            border_color = QColor("#ffffff") # Белый ободок
+            border_width = 2
+            shadow_alpha = 50 # Почти нет тени, луна светится
         else:
-            base_color = self.accent.darker(350); base_color.setAlpha(200) 
-            feat_color = self.accent.darker(250) 
-            border_color = QColor("#888899")
-        if self.is_hovered: border_color = border_color.lighter(150)
+            # КАМЕНЬ: Темно-серый, никакой жизни
+            base_color = QColor("#303030") 
+            feat_color = QColor("#404040")
+            border_color = QColor("#555555") # Тусклый ободок
+            border_width = 1
+            shadow_alpha = 180
+
+        if self.is_hovered: 
+            border_color = border_color.lighter(150)
+            if not self.is_done: base_color = QColor("#454545") # Чуть светлее при наведении, но всё равно серое
 
         painter.save(); moon_path = QPainterPath(); moon_path.addEllipse(self.rect); painter.setClipPath(moon_path)
         painter.fillPath(moon_path, QBrush(base_color))
+        
         painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(QBrush(feat_color))
         for feat in self.features: painter.drawPath(feat)
-        shadow_grad = QRadialGradient(QPointF(0, 0), self.radius); shadow_grad.setColorAt(0.6, QColor(0,0,0,0)); shadow_grad.setColorAt(1.0, QColor(0,0,0,180))
+        
+        # Тень
+        shadow_grad = QRadialGradient(QPointF(0, 0), self.radius)
+        shadow_grad.setColorAt(0.6, QColor(0,0,0,0))
+        shadow_grad.setColorAt(1.0, QColor(0,0,0,shadow_alpha))
         painter.fillPath(moon_path, QBrush(shadow_grad)); painter.restore()
         
-        pen = QPen(border_color, 2.5)
-        color_b = QColor(border_color); color_b.setAlpha(120); pen.setColor(color_b)
+        pen = QPen(border_color, border_width)
         painter.setPen(pen); painter.setBrush(Qt.BrushStyle.NoBrush); painter.drawEllipse(self.rect)
-        
-        spec = QRadialGradient(QPointF(-self.radius/3, -self.radius/3), self.radius/2)
-        spec.setColorAt(0, QColor(255,255,255,80)); spec.setColorAt(1, QColor(255,255,255,0))
-        painter.setPen(Qt.PenStyle.NoPen); painter.setBrush(QBrush(spec)); painter.drawEllipse(QRectF(-self.radius/2, -self.radius/2, self.radius, self.radius))

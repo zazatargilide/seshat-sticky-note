@@ -4,15 +4,16 @@ import random
 import os
 from datetime import datetime
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGraphicsView, QGraphicsScene, 
-                             QGraphicsItem, QGraphicsPathItem, QMenu, QApplication)
+                             QGraphicsItem, QMenu, QApplication)
 from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF
-from PyQt6.QtGui import (QColor, QBrush, QPainter, QPainterPath, QPen, 
-                         QPixmap, QPolygonF, QRadialGradient, QFont, QAction, QScreen)
+from PyQt6.QtGui import (QColor, QBrush, QPainter, QPen, 
+                         QPixmap, QRadialGradient)
 
+# Импортируем наши классы (убедись, что файлы лежат рядом)
 from gm_planet import TaskPlanetItem
 from gm_sun import SunItem
 
-# --- ZODIAC DATA ---
+# --- ДАННЫЕ ЗОДИАКА ---
 ZODIAC_SIGNS = [
     ("Capricorn", (12, 22), (1, 19)), ("Aquarius", (1, 20), (2, 18)),
     ("Pisces", (2, 19), (3, 20)),     ("Aries", (3, 21), (4, 19)),
@@ -48,9 +49,10 @@ class ZodiacOverlay(QWidget):
         for name, (sm, sd), (em, ed) in ZODIAC_SIGNS:
             start = datetime(now.year, sm, sd)
             end = datetime(now.year, em, ed)
+            # Обработка Козерога (через Новый год)
             if name == "Capricorn":
-                if now.month == 12 and now.day >= 22: self.sign_name = name; break
-                if now.month == 1 and now.day <= 19: self.sign_name = name; break
+                if (now.month == 12 and now.day >= 22) or (now.month == 1 and now.day <= 19):
+                    self.sign_name = name; break
             elif start <= now <= end:
                 self.sign_name = name; break
         
@@ -69,25 +71,199 @@ class ZodiacOverlay(QWidget):
                 painter.drawLine(QPointF(*self.points[i]), QPointF(*self.points[i+1]))
         
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(QColor(255,255,255,255))) 
         for x, y in self.points:
             grad = QRadialGradient(QPointF(x,y), 8)
             grad.setColorAt(0, QColor(255,255,255,255))
             grad.setColorAt(1, QColor(255,255,255,0))
             painter.setBrush(QBrush(grad))
             painter.drawEllipse(QPointF(x, y), 8, 8)
+            
             painter.setBrush(QBrush(QColor(255,255,255,255)))
             painter.drawEllipse(QPointF(x, y), 3, 3)
 
+# --- ГЛАВНАЯ СЦЕНА С КОСМОСОМ ---
+class DynamicStarryScene(QGraphicsScene):
+    def __init__(self):
+        super().__init__()
+        self.stars = []
+        self.constellations = []
+        self.ghost_galaxies = [] 
+        self.bg_pixmap = None
+        self.time_counter = 0
+        
+        # Пытаемся найти картинку фона, если есть
+        for ext in ["jpg", "png", "jpeg"]:
+             if os.path.exists(f"space_bg.{ext}"):
+                 self.bg_pixmap = QPixmap(f"space_bg.{ext}")
+                 break
+
+    def clear_items(self):
+        # Очищаем только игровые объекты, фон не трогаем, но звезд пересоздадим при ресайзе
+        self.clear()
+        self.stars = []
+        self.constellations = []
+        self.ghost_galaxies = []
+
+    def init_background(self, rect):
+        if self.stars: return # Если звезды уже есть, не пересоздаем
+        
+        # Генерируем область чуть больше видимой, чтобы при зуме не было краев
+        area = rect.adjusted(-3000, -3000, 3000, 3000)
+        w, h = int(area.width()), int(area.height())
+        cx, cy = area.center().x(), area.center().y()
+        
+        # 1. Призрачные галактики (туманности на фоне)
+        for _ in range(5):
+            gx = cx + random.uniform(-w/2, w/2)
+            gy = cy + random.uniform(-h/2, h/2)
+            gw = random.uniform(500, 1200)
+            gh = random.uniform(300, 800)
+            angle = random.uniform(0, 360)
+            color = QColor(random.choice(["#330044", "#002244", "#004444"]))
+            color.setAlpha(40) 
+            self.ghost_galaxies.append((gx, gy, gw, gh, angle, color))
+
+        # 2. Звезды
+        for _ in range(1200): # Количество звезд
+            sx = cx + random.uniform(-w/2, w/2)
+            sy = cy + random.uniform(-h/2, h/2)
+            vx = random.uniform(-0.05, 0.05) # Скорость дрейфа X
+            vy = random.uniform(-0.05, 0.05) # Скорость дрейфа Y
+            
+            stype = random.choice(['dot', 'dot', 'dot', 'cross4'])
+            if random.random() > 0.99: 
+                size = random.uniform(5.0, 9.0)
+                stype = 'giant'
+            else: 
+                size = random.uniform(1.0, 3.5)
+            
+            color = QColor(255, 255, 255)
+            color.setAlpha(random.randint(100, 255))
+            
+            self.stars.append({
+                'x': sx, 'y': sy, 
+                'vx': vx, 'vy': vy, 
+                's': size, 't': stype, 
+                'c': color, 
+                'flash_timer': random.randint(0, 500)
+            })
+
+    def advance(self):
+        """Метод анимации: вызывается таймером"""
+        super().advance() # Обновляем планеты и луны (метод advance у Items)
+        self.time_counter += 1
+        
+        # 1. Двигаем звезды
+        for s in self.stars:
+            s['x'] += s['vx']
+            s['y'] += s['vy']
+            
+            # Мерцание (редкое)
+            if random.random() > 0.999: s['flash_timer'] = 200
+            if s['flash_timer'] > 0: s['flash_timer'] -= 1
+        
+        # 2. Формируем созвездия (линии между звездами)
+        if self.time_counter % 150 == 0: # Каждые ~2.5 секунды пробуем создать созвездие
+            sample = random.sample(self.stars, min(len(self.stars), 60))
+            for i in range(len(sample)):
+                s1 = sample[i]
+                for j in range(i+1, len(sample)):
+                    s2 = sample[j]
+                    dist = math.hypot(s1['x']-s2['x'], s1['y']-s2['y'])
+                    # Если звезды близко, соединяем их "линией жизни"
+                    if 50 < dist < 300 and random.random() > 0.9:
+                         self.constellations.append({'s1':s1, 's2':s2, 'life': 400, 'max_life': 400})
+        
+        # 3. Старение созвездий
+        self.constellations = [c for c in self.constellations if c['life'] > 0]
+        for c in self.constellations: c['life'] -= 1
+        
+        # Вызываем перерисовку фона
+        self.update() 
+
+    def drawBackground(self, painter, rect):
+        # Заливка черным
+        painter.fillRect(rect, QBrush(QColor("#050505")))
+
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Если есть картинка фона - рисуем
+        if self.bg_pixmap: 
+            painter.drawPixmap(rect.toRect(), self.bg_pixmap.scaled(rect.size().toSize(), Qt.AspectRatioMode.KeepAspectRatioByExpanding))
+        
+        # Рисуем Галактики
+        painter.setPen(Qt.PenStyle.NoPen)
+        for gx, gy, gw, gh, angle, color in self.ghost_galaxies:
+            painter.save()
+            painter.translate(gx, gy)
+            painter.rotate(angle)
+            grad = QRadialGradient(QPointF(0,0), gw/2)
+            grad.setColorAt(0, color)
+            grad.setColorAt(1, QColor(0,0,0,0))
+            painter.setBrush(QBrush(grad))
+            painter.drawEllipse(QRectF(-gw/2, -gh/2, gw, gh))
+            painter.restore()
+
+        # Рисуем Созвездия (Линии)
+        pen = QPen(QColor(255,255,255), 1.5)
+        for c in self.constellations:
+            # Прозрачность зависит от жизни (появление -> жизнь -> затухание)
+            life_ratio = c['life'] / c['max_life']
+            alpha = int(150 * math.sin(life_ratio * math.pi)) # Синусоида для плавности
+            if alpha > 0: 
+                pen.setColor(QColor(200, 220, 255, alpha))
+                painter.setPen(pen)
+                painter.drawLine(QPointF(c['s1']['x'], c['s1']['y']), QPointF(c['s2']['x'], c['s2']['y']))
+
+        # Рисуем Звезды
+        painter.setPen(Qt.PenStyle.NoPen)
+        for s in self.stars:
+            painter.setBrush(QBrush(s['c']))
+            pt = QPointF(s['x'], s['y'])
+            size = s['s']
+            
+            # Эффект вспышки
+            if s['flash_timer'] > 0:
+                ratio = math.sin((s['flash_timer']/200.0)*math.pi)
+                size += ratio * 3.0
+                painter.setBrush(QBrush(QColor(255,255,255,255)))
+            
+            if s['t'] == 'giant':
+                 # Свечение вокруг гигантов
+                 glow = QRadialGradient(pt, size*5)
+                 glow.setColorAt(0, QColor(255,255,255,100))
+                 glow.setColorAt(1, QColor(0,0,0,0))
+                 painter.setBrush(QBrush(glow))
+                 painter.drawEllipse(pt, size*5, size*5)
+                 
+                 # Сама звезда
+                 painter.setBrush(QBrush(QColor(255,255,255,255)))
+                 painter.drawEllipse(pt, size, size)
+                 
+            elif s['t'] == 'dot': 
+                painter.drawEllipse(pt, size, size)
+                
+            elif s['t'] == 'cross4':
+                arms = 4
+                radius = size * 4
+                rotation = self.time_counter * 0.05
+                painter.setPen(QPen(s['c'], 1.0))
+                for i in range(arms):
+                    rad = math.radians((i * 90) + rotation)
+                    painter.drawLine(pt, QPointF(pt.x() + math.cos(rad)*radius, pt.y() + math.sin(rad)*radius))
+                painter.setPen(Qt.PenStyle.NoPen)
+
+
+# --- ГЛАВНОЕ ОКНО ---
 class GoalMapWindow(QWidget):
     def __init__(self, note_data, default_accent, save_callback=None):
         super().__init__()
         self.note_data = note_data
         self.accent = QColor(default_accent)
         self.save_callback = save_callback
-        
         self.planet_size_mode = 3
         
+        # Парсинг заголовка
         raw_title = self.note_data.get("title", "Note")
         clean_title = raw_title.split(" - ")[0]
         clean_title = re.sub(r'[:]?\s*\d{2}\.\d{2}\.\d{4}.*', '', clean_title).strip()
@@ -96,14 +272,13 @@ class GoalMapWindow(QWidget):
             
         self.setWindowTitle(self.note_title) 
         self.resize(1200, 900)
-        
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
+        # Сцена и View
         self.scene = DynamicStarryScene() 
-        self.scene.setBackgroundBrush(QBrush(QColor("#050505")))
         
         self.view = QGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -113,6 +288,7 @@ class GoalMapWindow(QWidget):
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self.view)
         
+        # Зодиак
         self.zodiac = ZodiacOverlay(self)
         self.zodiac.move(20, 20)
         self.zodiac.raise_()
@@ -121,9 +297,10 @@ class GoalMapWindow(QWidget):
         self.pinned_planet = None
         self.is_wallpaper_mode = False 
         
+        # ТАЙМЕР АНИМАЦИИ (ВАЖНО ДЛЯ ЗВЕЗД)
         self.anim_timer = QTimer(self)
         self.anim_timer.timeout.connect(self.game_loop)
-        self.anim_timer.start(16) 
+        self.anim_timer.start(16) # ~60 FPS
 
         self.build_map()
 
@@ -174,38 +351,22 @@ class GoalMapWindow(QWidget):
             self.showNormal()
             self.activateWindow()
 
-    def refresh_map_state(self):
-        pass
-
     def update_data_snapshot(self, new_note_data):
-        """
-        ЖЕСТКОЕ обновление данных
-        """
         self.note_data = new_note_data
         new_tasks = self.note_data.get("tasks", [])
         
-        # Если число задач изменилось — перестраиваем всё
         if len(new_tasks) != len(self.planets):
             self.build_map()
             return
 
         for i, planet in enumerate(self.planets):
             new_p_data = new_tasks[i]
-            
-            # [FIX] ОБЯЗАТЕЛЬНО обновляем ссылку на данные в самой планете
             planet.data = new_p_data 
-            
-            # [FIX] И самое главное — обновляем список детей!
-            # Иначе при повторном клике refresh_geometry будет смотреть в старый список детей
             planet.children_data = new_p_data.get("children", [])
-            
-            # Принудительно вызываем sync_with_data, чтобы применились цвета и разрушения
             planet.sync_with_data()
             
-            # Теперь синхронизируем луны
             from gm_moon import SubTaskMoonItem
             moons = [c for c in planet.childItems() if isinstance(c, SubTaskMoonItem)]
-            
             new_children_list = planet.children_data
             if len(new_children_list) == len(moons):
                 for j, moon in enumerate(moons):
@@ -213,7 +374,7 @@ class GoalMapWindow(QWidget):
                     moon.sync_with_data()
             
         self.update_progress()
-        self.scene.update() # Форсируем перерисовку сцены
+        self.scene.update()
 
     def build_map(self):
         self.scene.clear_items()
@@ -227,59 +388,90 @@ class GoalMapWindow(QWidget):
         self.scene.addItem(self.sun)
         
         if tasks:
-            count = len(tasks)
-            start_orbit = 350 if self.planet_size_mode == 1 else (500 if self.planet_size_mode == 2 else 850)
-            current_orbit_r = start_orbit
-            angle_step = 360 / count if count > 0 else 0
+            # --- ЛОГИКА 3: Считаем общий вес (сумма всех лун) для расчета % ---
+            total_system_moons = 0
+            for t in tasks:
+                total_system_moons += len(t.get("children", []))
             
-            for i, task in enumerate(tasks):
-                moons_count = len(task.get("children", []))
+            if total_system_moons == 0: total_system_moons = len(tasks) # Защита от деления на ноль
+
+            count = len(tasks)
+            current_orbit_r = 350 if self.planet_size_mode == 1 else (500 if self.planet_size_mode == 2 else 850)
+            
+            for task in tasks:
+                children = task.get("children", [])
+                task_moons_count = len(children)
                 
-                base_p_size = 150 if self.planet_size_mode == 1 else (250 if self.planet_size_mode == 2 else 400)
+                # --- ХАОТИЧНЫЙ РАЗМЕР ОТ ПРЕФИКСА ---
+                # Если total=100, а тут 99, то ratio = 0.99 (гигант)
+                ratio = task_moons_count / total_system_moons if total_system_moons > 0 else 0.1
+                
+                # Базовый размер + бонус за важность (вес)
+                min_r = 20
+                max_r_bonus = 8000 # Максимальная добавка к радиусу
+                
+                # Основной размер от веса
+                calculated_radius = min_r + (ratio * max_r_bonus) 
+                
+                # Добавляем хаотичный шум, чтобы не было идеально математически
+                calculated_radius += random.uniform(-20, 40)
+                calculated_radius = max(60, calculated_radius) # Не меньше 60
+
+                # --- ОРБИТА ---
+                # Считаем место под планету с учетом её нового размера и лун
                 moon_mult = 15 if self.planet_size_mode == 1 else (30 if self.planet_size_mode == 2 else 60)
+                system_width = calculated_radius + (task_moons_count * moon_mult)
                 
-                system_radius = base_p_size + (moons_count * moon_mult)
-                current_orbit_r += system_radius
+                # Хаотичный зазор между орбитами (чтобы не было спирали)
+                chaos_gap = random.randint(50, 400)
+                current_orbit_r += (system_width / 2) + chaos_gap
                 
-                start_angle = i * angle_step
+                # --- ЛОГИКА 1: Хаотичное расположение (Угол) ---
+                start_angle = random.uniform(0, 360)
                 
-                planet = TaskPlanetItem(task, self.accent, current_orbit_r, start_angle, self.on_planet_pinned, self.update_progress, size_mode=self.planet_size_mode)
+                planet = TaskPlanetItem(
+                    task, 
+                    self.accent, 
+                    current_orbit_r, 
+                    start_angle, 
+                    self.on_planet_pinned, 
+                    self.update_progress, 
+                    self.planet_size_mode,
+                    calculated_radius=calculated_radius # Передаем точный размер
+                )
                 self.scene.addItem(planet)
                 self.planets.append(planet)
                 
-                current_orbit_r += system_radius + (50 if self.planet_size_mode == 1 else 150)
+                # Сдвигаем орбиту для следующего шага
+                current_orbit_r += (system_width / 2)
 
-        max_r = self.planets[-1].orbit_radius + 1500 if self.planets else 2000
+        max_r = self.planets[-1].orbit_radius + 2000 if self.planets else 2000
         rect = QRectF(-max_r, -max_r, max_r*2, max_r*2)
+        
+        # ВАЖНО: Инициализация фона (звезды)
         self.scene.init_background(rect)
+        
         QTimer.singleShot(50, self._initial_fit)
 
     def _calculate_progress(self):
         tasks = self.note_data.get("tasks", [])
         if not tasks: return 0.0
-        
         total_percentage_sum = 0.0
-        
         for task in tasks:
             children = task.get("children", [])
-            
             if children:
                 done_moons = sum(1 for c in children if c.get("checked", False))
                 task_percent = done_moons / len(children)
-                if task.get("checked", False):
-                    task_percent = 1.0
+                if task.get("checked", False): task_percent = 1.0
             else:
                 task_percent = 1.0 if task.get("checked", False) else 0.0
-            
             total_percentage_sum += task_percent
-
         return total_percentage_sum / len(tasks)
 
     def update_progress(self):
         ratio = self._calculate_progress()
         self.sun.set_progress(ratio)
-        if self.save_callback:
-            self.save_callback()
+        if self.save_callback: self.save_callback()
 
     def _initial_fit(self):
         self.view.fitInView(self.scene.itemsBoundingRect().adjusted(-200,-200,200,200), Qt.AspectRatioMode.KeepAspectRatio)
@@ -287,7 +479,7 @@ class GoalMapWindow(QWidget):
     def on_sun_pinned(self, sun):
         if sun:
             self.pinned_planet = None
-            self.on_planet_pinned(None) # Reset planets
+            self.on_planet_pinned(None) 
             self.sun.set_pinned_visual(True)
             self._focus_on_rect(self.sun.boundingRect())
         else:
@@ -314,9 +506,11 @@ class GoalMapWindow(QWidget):
         self.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def game_loop(self):
+        # ВАЖНО: Двигаем сцену (звезды) и объекты (планеты)
         self.scene.advance()
         self.sun.advance(1)
         
+        # Плавная камера
         if self.pinned_planet:
             item_rect = self.pinned_planet.boundingRect()
             target_rect = self.pinned_planet.mapRectToScene(item_rect)
@@ -340,146 +534,3 @@ class GoalMapWindow(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.zodiac.move(20, 20)
-
-class DynamicStarryScene(QGraphicsScene):
-    def __init__(self):
-        super().__init__()
-        self.stars = []
-        self.constellations = []
-        self.ghost_galaxies = [] 
-        self.bg_pixmap = None
-        self.time_counter = 0
-        
-        for ext in ["jpg", "png", "jpeg"]:
-             if os.path.exists(f"space_bg.{ext}"):
-                 self.bg_pixmap = QPixmap(f"space_bg.{ext}")
-                 break
-
-    def clear_items(self):
-        self.clear()
-        self.stars = []
-        self.constellations = []
-        self.ghost_galaxies = []
-
-    def init_background(self, rect):
-        if self.stars: return
-        
-        area = rect.adjusted(-3000, -3000, 3000, 3000)
-        w, h = int(area.width()), int(area.height())
-        cx, cy = area.center().x(), area.center().y()
-        
-        for _ in range(5):
-            gx = cx + random.uniform(-w/2, w/2)
-            gy = cy + random.uniform(-h/2, h/2)
-            gw = random.uniform(500, 1200)
-            gh = random.uniform(300, 800)
-            angle = random.uniform(0, 360)
-            color = QColor(random.choice(["#330044", "#002244", "#004444"]))
-            color.setAlpha(40) 
-            self.ghost_galaxies.append((gx, gy, gw, gh, angle, color))
-
-        for _ in range(1000):
-            sx = cx + random.uniform(-w/2, w/2)
-            sy = cy + random.uniform(-h/2, h/2)
-            vx = random.uniform(-0.05, 0.05)
-            vy = random.uniform(-0.05, 0.05)
-            stype = random.choice(['dot', 'dot', 'cross4'])
-            
-            if random.random() > 0.99: 
-                size = random.uniform(5.0, 9.0)
-                stype = 'giant'
-            else: 
-                size = random.uniform(1.0, 3.5)
-            
-            color = QColor(255, 255, 255)
-            color.setAlpha(random.randint(150, 255))
-            self.stars.append({'x': sx, 'y': sy, 'vx': vx, 'vy': vy, 's': size, 't': stype, 'c': color, 'flash_timer': random.randint(0, 500)})
-
-    def advance(self):
-        super().advance()
-        self.time_counter += 1
-        
-        for s in self.stars:
-            s['x'] += s['vx']
-            s['y'] += s['vy']
-            if random.random() > 0.9998: s['flash_timer'] = 200
-            if s['flash_timer'] > 0: s['flash_timer'] -= 1
-        
-        if self.time_counter % 200 == 0:
-            sample = random.sample(self.stars, min(len(self.stars), 60))
-            for i in range(len(sample)):
-                s1 = sample[i]
-                for j in range(i+1, len(sample)):
-                    s2 = sample[j]
-                    dist = math.hypot(s1['x']-s2['x'], s1['y']-s2['y'])
-                    if 50 < dist < 300 and random.random() > 0.85:
-                         self.constellations.append({'s1':s1, 's2':s2, 'life': 400, 'max_life': 400})
-        
-        self.constellations = [c for c in self.constellations if c['life'] > 0]
-        for c in self.constellations: c['life'] -= 1
-
-    def drawBackground(self, painter, rect):
-        bg_brush = self.backgroundBrush()
-        
-        if bg_brush.style() == Qt.BrushStyle.NoBrush:
-            return
-
-        painter.fillRect(rect, bg_brush)
-
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        if self.bg_pixmap: 
-            painter.drawPixmap(rect.toRect(), self.bg_pixmap.scaled(rect.size().toSize(), Qt.AspectRatioMode.KeepAspectRatioByExpanding))
-        
-        painter.setPen(Qt.PenStyle.NoPen)
-        for gx, gy, gw, gh, angle, color in self.ghost_galaxies:
-            painter.save()
-            painter.translate(gx, gy)
-            painter.rotate(angle)
-            grad = QRadialGradient(QPointF(0,0), gw/2)
-            grad.setColorAt(0, color)
-            grad.setColorAt(1, QColor(0,0,0,0))
-            painter.setBrush(QBrush(grad))
-            painter.drawEllipse(QRectF(-gw/2, -gh/2, gw, gh))
-            painter.restore()
-
-        pen = QPen(QColor(255,255,255), 1.5)
-        for c in self.constellations:
-            alpha = int(180 * math.sin((c['life']/c['max_life']) * math.pi))
-            if alpha > 0: 
-                pen.setColor(QColor(200, 220, 255, alpha))
-                painter.setPen(pen)
-                painter.drawLine(QPointF(c['s1']['x'], c['s1']['y']), QPointF(c['s2']['x'], c['s2']['y']))
-
-        painter.setPen(Qt.PenStyle.NoPen)
-        for s in self.stars:
-            painter.setBrush(QBrush(s['c']))
-            pt = QPointF(s['x'], s['y'])
-            size = s['s']
-            
-            if s['flash_timer'] > 0:
-                ratio = math.sin((s['flash_timer']/200.0)*math.pi)
-                size += ratio * 3.0
-                painter.setBrush(QBrush(QColor(255,255,255,255)))
-            
-            if s['t'] == 'giant':
-                 glow = QRadialGradient(pt, size*5)
-                 glow.setColorAt(0, QColor(255,255,255,100))
-                 glow.setColorAt(1, QColor(0,0,0,0))
-                 painter.setBrush(QBrush(glow))
-                 painter.drawEllipse(pt, size*5, size*5)
-                 painter.setBrush(QBrush(QColor(255,255,255,255)))
-                 painter.drawEllipse(pt, size, size)
-                 
-            elif s['t'] == 'dot': 
-                painter.drawEllipse(pt, size, size)
-                
-            elif s['t'] == 'cross4':
-                arms = 4
-                radius = size * 4
-                rotation = self.time_counter * 0.05
-                painter.setPen(QPen(s['c'], 1.0))
-                for i in range(arms):
-                    rad = math.radians((i * 90) + rotation)
-                    painter.drawLine(pt, QPointF(pt.x() + math.cos(rad)*radius, pt.y() + math.sin(rad)*radius))
-                painter.setPen(Qt.PenStyle.NoPen)
