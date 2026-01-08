@@ -22,6 +22,13 @@ jobs:
       - name: Set up Python
         run: uv python install
 
+      # --- ВОТ ЭТОТ НОВЫЙ ШАГ НУЖЕН ---
+      - name: Install Linux System Dependencies (Qt & OpenGL)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxkbcommon-x11-0 libdbus-1-3 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0
+      # --------------------------------
+
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
@@ -31,4 +38,6 @@ jobs:
       - name: Run Tests (Pytest) with Headless Display
         uses: GabrielBB/xvfb-action@v1
         with:
+          # Флаг --args нужен, чтобы передать аргументы xvfb, иногда это помогает стабильности
+          # Но в твоем случае ошибка была в библиотеках, так что просто запускаем
           run: uv run pytest
