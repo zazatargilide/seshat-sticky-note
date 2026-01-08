@@ -5,7 +5,6 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # -----------------------------------------------------------------------------
 
-import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QLineEdit, QTreeWidget
 
@@ -14,7 +13,6 @@ from data_history import DataHistory
 from data_parser import DataParser
 from task_tree import TodoItem
 from tree_core import TreeCore
-
 
 # --- MOCKS ---
 # We mock DataManager and MainWindow to avoid launching the entire application during tests.
