@@ -1,47 +1,47 @@
 # Seshat Sticky Note 📝
 
-Минималистичный виджет задач для рабочего стола на Python + PyQt6 с поддержкой "Ghost Mode" и умного трекинга прогресса.
+A minimalist desktop task widget built with Python + PyQt6, featuring "Ghost Mode" and smart progress tracking.
 
-## 🔥 Возможности
+## 🔥 Features
 
-* **Ghost Mode:** Полупрозрачное окно, пропускающее клики сквозь себя.
-* **Иерархия:** Бесконечная вложенность задач.
-* **Умный Прогресс:**
-    * Отмененные задачи исключаются из статистики.
-    * **RGB Mode:** Радуга при 100% выполнении.
-* **История:** Undo/Redo (Ctrl+Z / Ctrl+Y).
-* **Soft Delete:** Возможность "зачеркнуть" задачу без удаления.
-* **Локализация:** 20+ языков (EN, RU, KK, KY, UZ, TR и др.).
-* **Тайминги:** В заголовке отображается точная дата начала и завершения списка (`dd.MM.yyyy HH:mm`).
+* **Ghost Mode:** Semi-transparent window that allows clicks to pass through.
+* **Hierarchy:** Infinite task nesting.
+* **Smart Progress:**
+    * Cancelled tasks are excluded from statistics.
+    * **RGB Mode:** Rainbow effect upon 100% completion.
+* **History:** Undo/Redo (Ctrl+Z / Ctrl+Y).
+* **Soft Delete:** Ability to "strike through" a task without deleting it.
+* **Localization:** 20+ languages (EN, RU, KK, KY, UZ, TR, etc.).
+* **Timings:** The header displays the exact start and finish dates of the list (`dd.MM.yyyy HH:mm`).
 
-## 🚀 Запуск
+## 🚀 Getting Started
 
-1.  Установи зависимости:
+1.  Install dependencies using uv:
     ```bash
-    pip install -r requirements.txt
+    uv sync
     ```
 
-2.  Запусти:
+2.  Run the application:
     ```bash
-    python main.py
+    uv run main.py
     ```
 
-## ⌨️ Горячие клавиши
+## ⌨️ Hotkeys
 
-| Клавиша | Действие |
+| Key | Action |
 | :--- | :--- |
-| **Ctrl + N** | Новая задача |
-| **Delete** | Удалить задачу |
-| **Ctrl + Arrows** | Перемещение и вложенность |
-| **Ctrl + Z / Y** | Отмена / Повтор |
-| **Колесико мыши** | Прозрачность (в режиме замка 🔒) |
+| **Ctrl + N** | New Task |
+| **Delete** | Delete Task |
+| **Ctrl + Arrows** | Move / Nest Tasks |
+| **Ctrl + Z / Y** | Undo / Redo |
+| **Mouse Wheel** | Transparency (in Lock Mode 🔒) |
 
-## 📂 Файлы
+## 📂 Files
 
-* `main.py` — Старт.
-* `app.py` — Контроллер.
-* `data_manager.py` — База данных (`seshat_db.json`).
-* ... (остальные модули)
+* `main.py` — Entry point.
+* `app.py` — Controller.
+* `data_manager.py` — Database (`seshat_db.json`).
+* ... (other modules)
 
 ---
-*Данные сохраняются в `seshat_db.json`.*
+*Data is saved in `seshat_db.json`.*

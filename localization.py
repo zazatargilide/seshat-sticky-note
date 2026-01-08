@@ -1,9 +1,10 @@
-#localization
+# localization
+
 
 class Loc:
     # Текущий язык по умолчанию
-    lang = "en" 
-    
+    lang = "en"
+
     # Список доступных языков для меню
     lang_names = {
         "en": "English",
@@ -26,7 +27,7 @@ class Loc:
         "ko": "한국어",
         "ar": "العربية",
         "ja": "日本語",
-        "zh": "中文"
+        "zh": "中文",
     }
 
     data = {
@@ -59,7 +60,7 @@ class Loc:
             # --- Новые ключи ---
             "current_note": "Current Note",
             "delete_confirm_title": "Delete Note?",
-            "delete_confirm_text": "Delete this note forever?"
+            "delete_confirm_text": "Delete this note forever?",
         },
         "ru": {
             "title_default": "ЗАДАЧИ",
@@ -90,7 +91,7 @@ class Loc:
             # --- Новые ключи ---
             "current_note": "текущую заметку",
             "delete_confirm_title": "Удалить заметку?",
-            "delete_confirm_text": "Вы точно хотите удалить эту заметку навсегда?"
+            "delete_confirm_text": "Вы точно хотите удалить эту заметку навсегда?",
         },
         "kk": {
             "title_default": "ТАПСЫРМАЛАР",
@@ -117,7 +118,7 @@ class Loc:
             "note_to": "-",
             "done_by": "орындалды",
             "rename_title": "Атын өзгерту",
-            "rename_label": "Жазба атауы:"
+            "rename_label": "Жазба атауы:",
         },
         "ky": {
             "title_default": "МИЛДЕТТЕР",
@@ -144,7 +145,7 @@ class Loc:
             "note_to": "-",
             "done_by": "аткарылды",
             "rename_title": "Атын өзгөртүү",
-            "rename_label": "Жазуунун аты:"
+            "rename_label": "Жазуунун аты:",
         },
         "uz": {
             "title_default": "VAZIFALAR",
@@ -171,7 +172,7 @@ class Loc:
             "note_to": "-",
             "done_by": "bajarildi",
             "rename_title": "Qayta nomlash",
-            "rename_label": "Qayd nomi:"
+            "rename_label": "Qayd nomi:",
         },
         "tt": {
             "title_default": "БУРЫЧЛАР",
@@ -198,7 +199,7 @@ class Loc:
             "note_to": "-",
             "done_by": "үтәлде",
             "rename_title": "Исемен үзгәртү",
-            "rename_label": "Язма исеме:"
+            "rename_label": "Язма исеме:",
         },
         "az": {
             "title_default": "TAPŞIRIQLAR",
@@ -225,7 +226,7 @@ class Loc:
             "note_to": "-",
             "done_by": "bitdi",
             "rename_title": "Adını dəyiş",
-            "rename_label": "Qeyd adı:"
+            "rename_label": "Qeyd adı:",
         },
         "tr": {
             "title_default": "YAPILACAKLAR",
@@ -252,7 +253,7 @@ class Loc:
             "note_to": "-",
             "done_by": "tamamlandı",
             "rename_title": "Yeniden Adlandır",
-            "rename_label": "Not adı:"
+            "rename_label": "Not adı:",
         },
         "cs": {
             "title_default": "ÚKOLY",
@@ -279,7 +280,7 @@ class Loc:
             "note_to": "do",
             "done_by": "hotovo",
             "rename_title": "Přejmenovat",
-            "rename_label": "Název poznámky:"
+            "rename_label": "Název poznámky:",
         },
         "uk": {
             "title_default": "ЗАВДАННЯ",
@@ -306,7 +307,7 @@ class Loc:
             "note_to": "до",
             "done_by": "зроблено",
             "rename_title": "Перейменувати",
-            "rename_label": "Назва нотатки:"
+            "rename_label": "Назва нотатки:",
         },
         "pl": {
             "title_default": "ZADANIA",
@@ -333,7 +334,7 @@ class Loc:
             "note_to": "do",
             "done_by": "wykonano",
             "rename_title": "Zmień nazwę",
-            "rename_label": "Nazwa notatki:"
+            "rename_label": "Nazwa notatki:",
         },
         "es": {
             "title_default": "TAREAS",
@@ -360,7 +361,7 @@ class Loc:
             "note_to": "a",
             "done_by": "hecho",
             "rename_title": "Renombrar",
-            "rename_label": "Nombre de la nota:"
+            "rename_label": "Nombre de la nota:",
         },
         "fr": {
             "title_default": "TÂCHES",
@@ -387,7 +388,7 @@ class Loc:
             "note_to": "au",
             "done_by": "fait le",
             "rename_title": "Renommer",
-            "rename_label": "Nom de la note :"
+            "rename_label": "Nom de la note :",
         },
         "de": {
             "title_default": "AUFGABEN",
@@ -414,7 +415,7 @@ class Loc:
             "note_to": "bis",
             "done_by": "erledigt",
             "rename_title": "Umbenennen",
-            "rename_label": "Notizname:"
+            "rename_label": "Notizname:",
         },
         "nl": {
             "title_default": "TAKEN",
@@ -441,7 +442,7 @@ class Loc:
             "note_to": "tot",
             "done_by": "klaar op",
             "rename_title": "Hernoemen",
-            "rename_label": "Notitienaam:"
+            "rename_label": "Notitienaam:",
         },
         "it": {
             "title_default": "DA FARE",
@@ -468,7 +469,7 @@ class Loc:
             "note_to": "al",
             "done_by": "fatto il",
             "rename_title": "Rinomina",
-            "rename_label": "Nome nota:"
+            "rename_label": "Nome nota:",
         },
         "pt": {
             "title_default": "TAREFAS",
@@ -495,7 +496,7 @@ class Loc:
             "note_to": "até",
             "done_by": "feito em",
             "rename_title": "Renomear",
-            "rename_label": "Nome da nota:"
+            "rename_label": "Nome da nota:",
         },
         "ko": {
             "title_default": "할 일",
@@ -522,7 +523,7 @@ class Loc:
             "note_to": "~",
             "done_by": "완료:",
             "rename_title": "이름 변경",
-            "rename_label": "메모 이름:"
+            "rename_label": "메모 이름:",
         },
         "ja": {
             "title_default": "タスク",
@@ -549,7 +550,7 @@ class Loc:
             "note_to": "完了日:",
             "done_by": "完了:",
             "rename_title": "名前の変更",
-            "rename_label": "メモの名前:"
+            "rename_label": "メモの名前:",
         },
         "zh": {
             "title_default": "待办事项",
@@ -576,7 +577,7 @@ class Loc:
             "note_to": "至",
             "done_by": "完成于",
             "rename_title": "重命名",
-            "rename_label": "笔记名称:"
+            "rename_label": "笔记名称:",
         },
         "ar": {
             "title_default": "المهام",
@@ -603,8 +604,8 @@ class Loc:
             "note_to": "إلى",
             "done_by": "أنجزت في",
             "rename_title": "إعادة تسمية",
-            "rename_label": "اسم الملاحظة:"
-        }
+            "rename_label": "اسم الملاحظة:",
+        },
     }
 
     # ИСПРАВЛЕННЫЙ МЕТОД: теперь принимает default=None

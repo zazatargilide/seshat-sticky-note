@@ -1,7 +1,9 @@
-#tree_io.py
+# tree_io.py
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QBrush
+from PyQt6.QtGui import QBrush, QColor
+
 from task_tree import TodoItem
+
 
 class TreeIO:
     def __init__(self, tree_widget):
@@ -15,13 +17,15 @@ class TreeIO:
         tasks = []
         for i in range(parent_item.childCount()):
             item = parent_item.child(i)
-            tasks.append({
-                "text": item.text(0),
-                "checked": item.checkState(0) == Qt.CheckState.Checked,
-                "done_date": item.data(0, Qt.ItemDataRole.UserRole),
-                "cancelled": getattr(item, 'cancelled', False),
-                "children": self._collect_recursive(item)
-            })
+            tasks.append(
+                {
+                    "text": item.text(0),
+                    "checked": item.checkState(0) == Qt.CheckState.Checked,
+                    "done_date": item.data(0, Qt.ItemDataRole.UserRole),
+                    "cancelled": getattr(item, "cancelled", False),
+                    "children": self._collect_recursive(item),
+                }
+            )
         return tasks
 
     def load_data(self, tasks_data):
@@ -34,17 +38,17 @@ class TreeIO:
 
     def _build_item_recursive(self, data, parent):
         item = TodoItem(parent, data["text"], data.get("done_date"), data.get("cancelled", False))
-        
+
         state = Qt.CheckState.Checked if data["checked"] else Qt.CheckState.Unchecked
         item.setCheckState(0, state)
-        
+
         # Красим сразу при загрузке
         if data.get("cancelled", False):
-             item.setForeground(0, QBrush(QColor("#606060")))
+            item.setForeground(0, QBrush(QColor("#606060")))
         elif state == Qt.CheckState.Checked:
-             item.setForeground(0, QBrush(QColor("#606060")))
+            item.setForeground(0, QBrush(QColor("#606060")))
         else:
-             item.setForeground(0, QBrush(QColor("#e0e0e0")))
+            item.setForeground(0, QBrush(QColor("#e0e0e0")))
 
-        for child in data.get("children", []): 
+        for child in data.get("children", []):
             self._build_item_recursive(child, item)

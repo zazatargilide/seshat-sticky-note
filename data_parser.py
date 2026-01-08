@@ -1,6 +1,8 @@
-#data_parser.py
+# data_parser.py
 from PyQt6.QtCore import QDateTime
+
 from localization import Loc
+
 
 class DataParser:
     def __init__(self, data_manager):
@@ -8,33 +10,41 @@ class DataParser:
 
     def load_timings(self):
         """Парсит время из JSON (без изменений)"""
-        if not self.dm.current_note_id: return
+        if not self.dm.current_note_id:
+            return
         note = self.dm.all_notes[self.dm.current_note_id]
-        
+
         st_str = note.get("start_time_str")
         st_sec = note.get("start_time")
-        if st_str: self.dm.start_time = QDateTime.fromString(st_str, "dd.MM.yyyy HH:mm:ss")
-        elif isinstance(st_sec, (int, float)): self.dm.start_time = QDateTime.fromSecsSinceEpoch(int(st_sec))
-        else: self.dm.start_time = None
+        if st_str:
+            self.dm.start_time = QDateTime.fromString(st_str, "dd.MM.yyyy HH:mm:ss")
+        elif isinstance(st_sec, (int, float)):
+            self.dm.start_time = QDateTime.fromSecsSinceEpoch(int(st_sec))
+        else:
+            self.dm.start_time = None
 
         ft_str = note.get("finish_time_str")
         ft_sec = note.get("finish_time")
-        if ft_str: self.dm.finish_time = QDateTime.fromString(ft_str, "dd.MM.yyyy HH:mm:ss")
-        elif isinstance(ft_sec, (int, float)): self.dm.finish_time = QDateTime.fromSecsSinceEpoch(int(ft_sec))
-        else: self.dm.finish_time = None
+        if ft_str:
+            self.dm.finish_time = QDateTime.fromString(ft_str, "dd.MM.yyyy HH:mm:ss")
+        elif isinstance(ft_sec, (int, float)):
+            self.dm.finish_time = QDateTime.fromSecsSinceEpoch(int(ft_sec))
+        else:
+            self.dm.finish_time = None
 
     def update_smart_title(self):
         """
         Генерирует умный заголовок.
         Теперь добавляет дату завершения ДАЖЕ к кастомным названиям.
         """
-        if not self.dm.current_note_id: return
-        
+        if not self.dm.current_note_id:
+            return
+
         note = self.dm.all_notes[self.dm.current_note_id]
         curr_title = note.get("title", "")
-        
+
         # Разделитель, который мы используем для времени завершения (например " - Завершено: ")
-        finish_separator = f" {Loc.t('note_to')} " 
+        finish_separator = f" {Loc.t('note_to')} "
 
         # 1. ПЫТАЕМСЯ НАЙТИ "ЧИСТОЕ" НАЗВАНИЕ (без хвоста с датой завершения)
         # Если мы уже добавляли дату завершения раньше, её надо отрезать, чтобы не дублировать
@@ -42,7 +52,7 @@ class DataParser:
 
         # 2. ПРОВЕРЯЕМ: ЭТО АВТО-ЗАГОЛОВОК ИЛИ КАСТОМНЫЙ?
         is_auto = False
-        if clean_title == "TO-DO" or clean_title == Loc.t("title_default"): 
+        if clean_title == "TO-DO" or clean_title == Loc.t("title_default"):
             is_auto = True
         else:
             for lang in Loc.data:
@@ -50,7 +60,7 @@ class DataParser:
                 if clean_title.startswith(prefix):
                     is_auto = True
                     break
-        
+
         # 3. ЕСЛИ НЕТ ДАТЫ НАЧАЛА (АВТО-ЛЕЧЕНИЕ)
         if not self.dm.start_time:
             tasks = note.get("tasks", [])
@@ -62,7 +72,7 @@ class DataParser:
                 return
 
         full_format = "dd.MM.yyyy HH:mm"
-        
+
         # 4. ФОРМИРУЕМ НОВЫЙ ЗАГОЛОВОК
         new_title = ""
 

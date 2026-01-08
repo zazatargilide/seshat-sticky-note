@@ -1,22 +1,32 @@
-import sys
 import json
 import os
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QTextEdit, 
-                             QPushButton, QLabel, QMessageBox, QHBoxLayout, 
-                             QComboBox, QFrame, QSplitter)
-from PyQt6.QtCore import Qt
+import sys
+
+from PyQt6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class DatabaseInjector(QWidget):
     def __init__(self):
         super().__init__()
         self.db_filename = "seshat_db.json"
         self.init_ui()
-        self.refresh_notes_list() # Сразу загружаем список заметок
+        self.refresh_notes_list()  # Сразу загружаем список заметок
 
     def init_ui(self):
         self.setWindowTitle("Seshat DB Injector v2.0 💉")
         self.resize(900, 700)
-        
+
         # --- СТИЛИ (Dark Theme) ---
         self.setStyleSheet("""
             QWidget { background-color: #1e1e1e; color: #e0e0e0; font-family: Consolas, 'Segoe UI', monospace; font-size: 14px; }
@@ -46,7 +56,9 @@ class DatabaseInjector(QWidget):
         # --- БЛОК 1: ВВОД КОДА ---
         layout.addWidget(QLabel("1. Вставьте JSON код (новые заметки ИЛИ список задач):"))
         self.text_area = QTextEdit()
-        self.text_area.setPlaceholderText('Например:\n[\n  { "text": "Новая задача", "checked": false, "children": [] }\n]')
+        self.text_area.setPlaceholderText(
+            'Например:\n[\n  { "text": "Новая задача", "checked": false, "children": [] }\n]'
+        )
         layout.addWidget(self.text_area)
 
         # Кнопка очистки
@@ -61,7 +73,7 @@ class DatabaseInjector(QWidget):
         layout.addWidget(line)
 
         # --- БЛОК 2: УПРАВЛЕНИЕ ---
-        
+
         # Секция А: Добавление новой заметки целиком
         layout.addWidget(QLabel("ВАРИАНТ А: Создать новые заметки (Merge)"))
         self.btn_merge = QPushButton("СОЗДАТЬ НОВЫЕ ЗАМЕТКИ ИЗ КОДА")
@@ -78,11 +90,11 @@ class DatabaseInjector(QWidget):
 
         # Секция Б: Добавление задач в существующую
         layout.addWidget(QLabel("ВАРИАНТ Б: Добавить задачи в существующую заметку"))
-        
+
         hbox_append = QHBoxLayout()
         self.combo_notes = QComboBox()
         self.combo_notes.setPlaceholderText("Выберите заметку...")
-        
+
         btn_refresh = QPushButton("🔄")
         btn_refresh.setToolTip("Обновить список заметок")
         btn_refresh.setFixedWidth(40)
@@ -105,7 +117,7 @@ class DatabaseInjector(QWidget):
         if not os.path.exists(self.db_filename):
             return None
         try:
-            with open(self.db_filename, 'r', encoding='utf-8') as f:
+            with open(self.db_filename, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка БД", f"Не удалось прочитать файл:\n{e}")
@@ -113,7 +125,7 @@ class DatabaseInjector(QWidget):
 
     def save_db(self, data):
         try:
-            with open(self.db_filename, 'w', encoding='utf-8') as f:
+            with open(self.db_filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
@@ -146,23 +158,29 @@ class DatabaseInjector(QWidget):
     # --- ВАРИАНТ А: СЛИЯНИЕ (СТАРЫЙ МЕТОД) ---
     def merge_new_notes(self):
         new_data = self.get_json_input()
-        if not new_data: return
+        if not new_data:
+            return
 
         if "notes" not in new_data:
-            QMessageBox.warning(self, "Ошибка структуры", "Для создания заметок нужен JSON с ключом 'notes'.")
+            QMessageBox.warning(
+                self, "Ошибка структуры", "Для создания заметок нужен JSON с ключом 'notes'."
+            )
             return
 
         current_db = self.load_db()
         if not current_db:
             current_db = {"language": "ru", "notes": {}}
 
-        if "notes" not in current_db: current_db["notes"] = {}
+        if "notes" not in current_db:
+            current_db["notes"] = {}
 
         added = 0
         overwritten = 0
         for nid, ncontent in new_data["notes"].items():
-            if nid in current_db["notes"]: overwritten += 1
-            else: added += 1
+            if nid in current_db["notes"]:
+                overwritten += 1
+            else:
+                added += 1
             current_db["notes"][nid] = ncontent
 
         if "current_note_id" in new_data:
@@ -183,7 +201,8 @@ class DatabaseInjector(QWidget):
 
         # 2. Получаем задачи из текста
         input_data = self.get_json_input()
-        if not input_data: return
+        if not input_data:
+            return
 
         tasks_to_append = []
 
@@ -193,16 +212,22 @@ class DatabaseInjector(QWidget):
             tasks_to_append = input_data
         elif isinstance(input_data, dict):
             # Если вставили объект заметки { "text": "...", "children": [...] }
-            if "text" in input_data: # Это одна задача
+            if "text" in input_data:  # Это одна задача
                 tasks_to_append = [input_data]
-            elif "tasks" in input_data: # Это структура заметки { "title":..., "tasks": [...] }
+            elif "tasks" in input_data:  # Это структура заметки { "title":..., "tasks": [...] }
                 tasks_to_append = input_data["tasks"]
-            elif "notes" in input_data: # Вставили целый дамп БД?
-                QMessageBox.warning(self, "Ошибка", "Вы вставили полный дамп базы. Для добавления задач нужен список или объект одной задачи.")
+            elif "notes" in input_data:  # Вставили целый дамп БД?
+                QMessageBox.warning(
+                    self,
+                    "Ошибка",
+                    "Вы вставили полный дамп базы. Для добавления задач нужен список или объект одной задачи.",
+                )
                 return
             else:
                 # Пробуем предположить, что это задача без некоторых полей, или список в словаре
-                QMessageBox.warning(self, "Ошибка", "Непонятная структура. Нужен список задач или объект задачи.")
+                QMessageBox.warning(
+                    self, "Ошибка", "Непонятная структура. Нужен список задач или объект задачи."
+                )
                 return
 
         if not tasks_to_append:
@@ -212,7 +237,11 @@ class DatabaseInjector(QWidget):
         # 3. Обновляем базу
         current_db = self.load_db()
         if not current_db or target_id not in current_db["notes"]:
-            QMessageBox.critical(self, "Ошибка", "Целевая заметка не найдена в базе (возможно, файл был изменен извне).")
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                "Целевая заметка не найдена в базе (возможно, файл был изменен извне).",
+            )
             return
 
         # Добавляем
@@ -222,7 +251,12 @@ class DatabaseInjector(QWidget):
 
         if self.save_db(current_db):
             note_title = current_db["notes"][target_id].get("title", "???")
-            QMessageBox.information(self, "Успех", f"Добавлено {len(tasks_to_append)} задач(и) в заметку:\n'{note_title}'")
+            QMessageBox.information(
+                self,
+                "Успех",
+                f"Добавлено {len(tasks_to_append)} задач(и) в заметку:\n'{note_title}'",
+            )
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

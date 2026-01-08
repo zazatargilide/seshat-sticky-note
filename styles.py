@@ -1,16 +1,17 @@
-#styles.py
+# styles.py
 
 try:
     import ctypes
-    from ctypes import wintypes
+
     user32 = ctypes.windll.user32
     GWL_EXSTYLE = -20
     WS_EX_LAYERED = 0x00080000
     WS_EX_TRANSPARENT = 0x00000020
-except:
-    pass 
+except Exception:
+    pass
 
 import sys
+
 
 class WinUtils:
     @staticmethod
@@ -22,13 +23,14 @@ class WinUtils:
         try:
             hwnd = int(hwnd)
             styles = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            
+
             if enable:
                 user32.SetWindowLongW(hwnd, GWL_EXSTYLE, styles | WS_EX_TRANSPARENT)
             else:
                 user32.SetWindowLongW(hwnd, GWL_EXSTYLE, styles & ~WS_EX_TRANSPARENT)
         except Exception as e:
             print(f"WinAPI Error: {e}")
+
 
 class Styles:
     # Базовые стили кнопок
