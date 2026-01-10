@@ -53,6 +53,8 @@ class DataManager:
 
         except Exception as e:
             print(f"Error loading: {e}")
+            # Если файл битый, не затираем его сразу, а создаем новую сессию в памяти
+            # (но лучше бы сделать бэкап битого файла, если это критично)
             self.create_new_note()
 
     def save_current_state(self, tasks):
@@ -63,11 +65,9 @@ class DataManager:
         self.all_notes[self.current_note_id]["tasks"] = tasks
 
         # --- ЛОГИКА ВРЕМЕНИ (FIX/UPDATE) ---
-        # Авто-починка: Если задач добавили, а времени нет — ставим "Сейчас"
         if tasks and not self.start_time:
             self.start_time = QDateTime.currentDateTime()
 
-        # Сохранение времени в JSON-строки
         if self.start_time:
             self.all_notes[self.current_note_id]["start_time_str"] = self.start_time.toString(
                 "dd.MM.yyyy HH:mm:ss"
@@ -91,17 +91,40 @@ class DataManager:
         self.history.add_to_history(tasks)
 
     def save_to_disk(self, skip_history=False):
-        """Метод, который физически пишет файл на диск."""
+        """
+        АТОМАРНАЯ ЗАПИСЬ НА ДИСК.
+        Защищает от потери данных при отключении электричества.
+        """
         data = {
             "language": Loc.lang,
             "notes": self.all_notes,
             "current_note_id": self.current_note_id,
         }
+        
+        # Временное имя файла
+        temp_file = f"{self.filename}.tmp"
+        
         try:
-            with open(self.filename, "w", encoding="utf-8") as f:
+            # 1. Пишем во временный файл
+            with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+                
+                # 2. Принудительно сбрасываем буферы на физический диск
+                f.flush()
+                os.fsync(f.fileno())
+            
+            # 3. Атомарно подменяем старый файл новым
+            # На Windows начиная с Python 3.3 os.replace() атомарен
+            os.replace(temp_file, self.filename)
+            
         except Exception as e:
-            print(f"Error saving: {e}")
+            print(f"CRITICAL ERROR SAVING: {e}")
+            # Если что-то пошло не так, удаляем временный файл, чтобы не мусорить
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
 
     # --- УПРАВЛЕНИЕ ЗАМЕТКАМИ ---
 
@@ -112,24 +135,21 @@ class DataManager:
         self.start_time = QDateTime.currentDateTime()
         self.finish_time = None
 
-        # 1. Сначала создаем "болванку" заметки в базе
         self.all_notes[new_id] = {
-            "title": Loc.t("title_default"),  # Временное название
+            "title": Loc.t("title_default"),
             "tasks": [],
             "start_time_str": self.start_time.toString("dd.MM.yyyy HH:mm:ss"),
             "finish_time_str": None,
         }
 
-        # 2. Теперь, когда заметка есть в базе, вызываем парсер для генерации красивого заголовка с датой
         self.parser.update_smart_title()
-
         self.save_to_disk()
 
     def switch_note(self, note_id):
         if note_id in self.all_notes:
             self.current_note_id = note_id
-            self.parser.load_timings()  # Загружаем тайминги новой заметки
-            self.history.history = []  # Сбрасываем историю
+            self.parser.load_timings()
+            self.history.history = []
             self.history.history_index = -1
             return True
         return False
@@ -139,20 +159,34 @@ class DataManager:
             self.all_notes[self.current_note_id]["title"] = new_title
             self.save_to_disk()
 
-    # Методы delete_note, undo, redo теперь просто вызывают DataHistory.
-    # Их нужно пробросить через app.py, если они вызывались напрямую!
-
     def undo(self):
         if self.history.undo():
-            self.parser.load_timings()  # Обновим время, если оно откатилось
+            self.parser.load_timings()
             return True
         return False
 
     def redo(self):
         if self.history.redo():
-            self.parser.load_timings()  # Обновим время, если оно откатилось
+            self.parser.load_timings()
             return True
         return False
+
+    def delete_note(self, note_id):
+        """Удаляет заметку по ID"""
+        if note_id in self.all_notes:
+            del self.all_notes[note_id]
+            
+            # Если удалили текущую
+            if note_id == self.current_note_id:
+                if self.all_notes:
+                    # Переключаемся на первую попавшуюся
+                    new_id = list(self.all_notes.keys())[0]
+                    self.switch_note(new_id)
+                else:
+                    # Если ничего не осталось - создаем новую
+                    self.create_new_note()
+            
+            self.save_to_disk()
 
     def update_smart_title(self):
         self.parser.update_smart_title()

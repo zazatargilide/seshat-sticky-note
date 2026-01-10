@@ -9,6 +9,8 @@ env/
 
 # User Database (ВАЖНО)
 seshat_db.json
+_FULL_CODE_DUMP.txt
+collect_code.py
 
 # IDE settings
 .idea/

@@ -124,20 +124,12 @@ class DatabaseInjector(QWidget):
             return None
 
     def save_db(self, data):
-        temp_file = f"{self.db_filename}.tmp"
         try:
-            with open(temp_file, "w", encoding="utf-8") as f:
+            with open(self.db_filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno()) # Важно для надежности
-            
-            os.replace(temp_file, self.db_filename)
             return True
         except Exception as e:
             QMessageBox.critical(self, "Ошибка сохранения", f"Не удалось записать файл:\n{e}")
-            if os.path.exists(temp_file):
-                try: os.remove(temp_file)
-                except: pass
             return False
 
     def refresh_notes_list(self):
