@@ -1,5 +1,7 @@
 # ui_setup.py
+
 import os
+import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -19,8 +21,6 @@ from PyQt6.QtWidgets import (
 from delegates import DateDelegate
 from styles import Styles
 from task_tree import DraggableTreeWidget
-
-# Импортируем кастомные виджеты
 from widgets import CyberGrip, FloatingUnlockBtn, TitleLabel
 
 
@@ -29,9 +29,20 @@ class UISetup:
     def setup_ui(window):
         """Создает и размещает все элементы интерфейса на главном окне"""
 
+        # --- ХЕЛПЕР ДЛЯ ПУТЕЙ (Чтобы иконка работала внутри EXE) ---
+        def resource_path(relative_path):
+            """Ищет файл внутри временной папки EXE (если упаковано) или рядом (если код)"""
+            try:
+                # PyInstaller создает временную папку и хранит путь в _MEIPASS
+                base_path = sys._MEIPASS
+            except Exception:
+                base_path = os.path.abspath(".")
+            return os.path.join(base_path, relative_path)
+        
+        # Определяем путь к иконке один раз
+        icon_path = resource_path("icon.ico")
+
         # --- 1. НАСТРОЙКИ ОКНА ---
-        # Убрали Qt.WindowType.Tool, чтобы окно появилось в панели задач.
-        # Оставили Frameless (без рамок) и StaysOnTop (поверх всех).
         window.setWindowFlags(
             Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
         )
@@ -39,12 +50,10 @@ class UISetup:
         window.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         window.setMinimumSize(200, 150)
 
-        # --- 2. УСТАНОВКА ИКОНКИ ---
-        # Чтобы в панели задач было красиво
-        if os.path.exists("icon.ico"):
-            window.setWindowIcon(QIcon("icon.ico"))
+        # --- 2. УСТАНОВКА ИКОНКИ ОКНА ---
+        if os.path.exists(icon_path):
+            window.setWindowIcon(QIcon(icon_path))
         else:
-            # Фолбек: если иконки нет, берем стандартную системную
             window.setWindowIcon(window.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
 
         # --- 3. Центральный виджет ---
@@ -54,8 +63,6 @@ class UISetup:
 
         # --- 4. Основной лейаут ---
         window.layout = QVBoxLayout(window.central_widget)
-
-        # Отступы: Слева/Справа = 8px, Снизу = 20px (для треугольника изменения размера)
         window.layout.setContentsMargins(8, 12, 8, 20)
         window.layout.setSpacing(10)
 
@@ -63,7 +70,6 @@ class UISetup:
         header = QHBoxLayout()
         header.setSpacing(5)
 
-        # Политика для кнопок, чтобы они не исчезали при скрытии, а просто прятались
         retain_policy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         retain_policy.setRetainSizeWhenHidden(True)
 
@@ -75,7 +81,7 @@ class UISetup:
         window.menu_btn.setSizePolicy(retain_policy)
         header.addWidget(window.menu_btn)
 
-        # Заголовок (TitleLabel)
+        # Заголовок
         window.title = TitleLabel("TO-DO")
         window.title.setStyleSheet(
             "font-weight: 700; font-size: 12px; letter-spacing: 1px; color: #9e9e9e; margin-left: 5px;"
@@ -137,14 +143,11 @@ class UISetup:
                 border: none;
                 padding-right: 5px; 
             }
-            
-            /* Кастомный скроллбар */
             QScrollBar:vertical {
                 background: transparent;
                 width: 18px; 
                 margin: 0px 10px 0px 0px;
             }
-
             QScrollBar::handle:vertical {
                 background: #424242;      
                 min-height: 20px;
@@ -153,7 +156,6 @@ class UISetup:
             QScrollBar::handle:vertical:hover {
                 background: #606060;      
             }
-
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { 
                 height: 0px; 
                 background: none; 
@@ -178,13 +180,12 @@ class UISetup:
         window.grip_indicator.setFixedSize(24, 24)
         window.grip_indicator.raise_()
 
-        # --- 10. Трей ---
+        # --- 10. Трей (Здесь важно использовать правильный путь) ---
         window.tray = QSystemTrayIcon(window)
-        # Используем ту же логику для иконки трея
-        if os.path.exists("icon.ico"):
-            window.tray.setIcon(QIcon("icon.ico"))
+        if os.path.exists(icon_path):
+            window.tray.setIcon(QIcon(icon_path))
         else:
             window.tray.setIcon(window.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
 
-        # --- 11. Оверлей (Кнопка разблокировки) ---
+        # --- 11. Оверлей ---
         window.unlock_overlay = FloatingUnlockBtn(callback=None)

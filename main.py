@@ -1,38 +1,35 @@
 # main.py
-import os
+
 import sys
-import ctypes
-
-# Импортируем QIcon, чтобы программа не падала
-from PyQt6.QtGui import QIcon 
+import os
 from PyQt6.QtWidgets import QApplication
-
-# Фикс кэша (твой старый код)
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disk-cache-size=1"
-
+from PyQt6.QtGui import QIcon
 from app import StickyNote
 
-if __name__ == "__main__":
-    # --- 1. МАГИЯ ДЛЯ ИКОНКИ В ТАСКБАРЕ ---
-    myappid = 'ata.seshat.stickynote.version.1.6.127' # Любая уникальная строка
+# 1. Эта функция делает EXE автономным.
+# Она ищет файлы внутри EXE, если программа упакована.
+def resource_path(relative_path):
     try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-    except ImportError:
-        pass
+        base_path = sys._MEIPASS # Эта папка создается временно при запуске EXE
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
-    # Фиксы для экрана
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disk-cache-size=1"
+
+if __name__ == "__main__":
     os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
-    os.environ["QT_LOGGING_RULES"] = "qt.qpa.screen=false"
-
+    
     app = QApplication(sys.argv)
 
-    # --- 2. УСТАНОВКА ИКОНКИ ДЛЯ ВСЕГО ПРИЛОЖЕНИЯ ---
-    # Вычисляем путь, чтобы иконка находилась железно
-    basedir = os.path.dirname(os.path.abspath(__file__))
-    icon_path = os.path.join(basedir, "icon.ico")
-    
+    # 2. Устанавливаем иконку глобально для всего приложения сразу здесь
+    # Используем нашу функцию, чтобы найти иконку внутри EXE
+    icon_path = resource_path("icon.ico")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
     window = StickyNote()
+    # В ui_setup.py теперь можно вообще убрать установку иконки, 
+    # так как мы задали её глобально для app выше.
+    
     sys.exit(app.exec())
