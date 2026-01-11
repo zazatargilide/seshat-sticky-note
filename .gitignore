@@ -1,22 +1,45 @@
-# Python bytecode
+# --- Python Bytecode ---
 __pycache__/
+*.py[cod]
+*$py.class
 *.pyc
 
-# Virtual Environment
+# --- Virtual Environment ---
+.venv/
 venv/
 env/
+ENV/
 .env
 
-# User Database (ВАЖНО)
+# --- Build Artifacts (PyInstaller) ---
+build/
+dist/
+*.spec
+
+# --- Testing & Linting Cache ---
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+*.swp
+*.user
+*.suo
+
+# --- OS Metadata ---
+.DS_Store
+Thumbs.db
+
+# --- Project Specific / Temporary Files ---
+# (ВАЖНО: Игнорируем базу данных и дампы кода)
 seshat_db.json
+seshat_db.json.tmp
 _FULL_CODE_DUMP.txt
 collect_code.py
 
-# IDE settings
-.idea/
-.vscode/
-*.swp
-
-# OS metadata
-.DS_Store
-Thumbs.db
+# Logs and temp
+*.tmp
+*.log
